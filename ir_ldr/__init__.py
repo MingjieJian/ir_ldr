@@ -2,30 +2,60 @@ from . import private
 from . import tools
 
 def load_yj_linelist(l_type):
+
+    '''
+    Function to load the YJ-band LDR line list and LDR-Teff relations.
+
+    Parameters
+    ----------
+    l_type : string
+        Specify the type of relation set to load. Have to be one of the following: "dwarf", "giant" or "supergiant".
+
+    Returns
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing LDR linelist and LDR-Teff relations.
+
+    '''
+
     l_type_dict = {'dwarf':'dwarf', 'giant':'giant', 'supergiant':'spg'}
     df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[l_type]))
     return df
 
 def load_h_linelist():
+
+    '''
+    Function to load the H-band giant LDR line list and LDR-Teff relations.
+
+    Parameters
+    ----------
+
+    Returns
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing LDR linelist and LDR-Teff relations.
+
+    '''
+
     df = private.pd.read_csv(__path__[0] + '/file/h-ldr/lineratio_giant.csv')
     return df
 
-def depth_measure(wav, flux, line_input, suffix, SNR=False, func='parabola', plot=False, plot_shift=0):
+def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola', plot=False):
     '''
-    Function to measure the line depth of a spectrum. Provides the Gaussian, parabola and Gaussian-Hermite function for fitting the line, the depth as well as the wavelength of the minimum. Require SNR to calculate the error of line depth; if not given, then only the fitting error will be included. There is no error estimation for Guassian-Hermite fitting now.
+    Function to measure the line depth of a spectrum. Provides the Gaussian, parabola and Gaussian-Hermite function for fitting the line. Require signal to noise ratio (SNR) to calculate the error of line depth; if not given, then only the fitting error will be included. There is no error estimation for Guassian-Hermite fitting now.
 
     Parameters
     ----------
     wav : numpy.array
-        The wavelength of the in put spectrum. Should be in rest wavelength scale and telluric corrected.
+        The wavelength of the in put spectrum. Should be in rest wavelength scale.
 
     flux : numpy.array
-        The flux of the in put spectrum. Have to be in the same length with wav.
+        The flux of the in put spectrum. Have to be telluric corrected and in the same length with wav.
 
     line_input : float or list like object
         Linelist to be measured.
 
-    suffix : int or str
+    suffix : int or str, optional
         Suffix of columns of the output pandas DataFrame. 1 for low EP line and 2 for high EP line. If set to False, no suffix will be added, but it cannot be used to calculate the LDR in cal_LDR.
 
     SNR : float, optional
@@ -37,10 +67,10 @@ def depth_measure(wav, flux, line_input, suffix, SNR=False, func='parabola', plo
     plot : bool, default false
         To control plot the points used for fitting and the fitted function or not.
 
-    Returns
+    Return
     -------
-    depth : list, [depth, del_wav, error, flag]
-        The depth of each line in the linelist. Flag 0 means normal, 1 means fitting is ok but no smallest value found in the four pixels used for the fitting; 2 means the fitting is bad and should be rejected. The result will be NaN if the flag is not 0. Flag -1 means the line is outside the spectral range.
+    depth_measure_pd : pandas.DataFrame, [depth, del_wav, error, flag]
+        A DataFrame containing depth of each line in the linelist. Flag 0 means normal, 1 means fitting is ok but no smallest value found in the four pixels used for the fitting; 2 means the fitting is bad and should be rejected. The result will be NaN if the flag is not 0. Flag -1 means the line is outside the spectral range.
     '''
 
     # Convert the type of line into list (if only one number was input)
@@ -94,10 +124,10 @@ def depth_measure(wav, flux, line_input, suffix, SNR=False, func='parabola', plo
             elif abs(poly_del_wav) > private.np.max(sub_wav-line):
                 poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 1
             if plot:
-                private.plt.scatter(sub_wav, sub_flux+plot_shift, c='red')
+                private.plt.scatter(sub_wav, sub_flux, c='red')
                 # x = private.np.arange(sub_wav[0], sub_wav[-1],0.001)
                 x = private.np.arange(line-1.5, line+1.5, 0.001)
-                y = private.parabola2_func(x-line, a, b, c)+plot_shift
+                y = private.parabola2_func(x-line, a, b, c)
                 private.plt.plot(x[y<=1], y[y<=1], c='C1', label='Parabola fitting')
 
         if func == 'Gauss':
@@ -161,6 +191,23 @@ def depth_measure(wav, flux, line_input, suffix, SNR=False, func='parabola', plo
 def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
 
     '''
+    Function to calculate LDR or lg(LDR) values.
+
+    Parameters
+    ----------
+    depth_pd_1 : pandas.DataFrame
+        The depth measurement (output) of depth_measure with suffix 1. They act as divisors in LDR.
+
+    depth_pd_2 : pandas.DataFrame
+        The depth measurement (output) of depth_measure with suffix 2. They act as dividends in LDR.
+
+    type : str, optional
+        The type of LDR to be calculated. Have to be 'LDR' or 'lgLDR' (log10).
+
+    Return
+    ----------
+    LDR_pd : pandas.DataFrame
+        A DataFrame containing the LDR/lgLDR values and their errors.
     '''
 
     d1 = depth_pd_1['depth1'].values
@@ -186,10 +233,17 @@ def combine_df(df_list, remove_line_wav=True):
     '''
     Function to combine the DataFrame of linelist, depth measurement and LDR. Set remove_line_wav to False to keep the line_wav in each DataFrame.
 
+    Parameters
+    ----------
     df_list : list, contain DataFrame to be combined.
 
     remove_line_wav : bool, optional
         Whether to remove the "line_wav" column or not.
+
+    Return
+    ----------
+    output_df : pandas.DataFrame
+        A DataFrame containing the combined values.
     '''
     for i in range(len(df_list)):
         if df_list[i].index[0] != 0:
@@ -201,6 +255,44 @@ def combine_df(df_list, remove_line_wav=True):
     return output_df
 
 def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=False, abun=False, abun_err=False):
+
+    '''
+    Function to calculate the temperature derived by each H-band LDR-Teff relation (T_LDRi) and their weighted mean (T_LDR).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The input DataFrame of the output of combine_df. Must contain linelist information from load_h_linelist and LDR information.
+
+    metal_term : bool, optional
+        Choose which set of relations (without or with metallicity/abundance terms) to be used. If set to True, then please note the setting of fe_h, fe_h_err, abun and abun_err. These two set of relations correspond to Table2 (without metal-terms) and Table3 (with metal-terms) of Jian+19.
+
+    df_output : bool, optional
+        Set to True to output the DataFrame containing T_LDRi.
+
+    fe_h : float, optional
+        Metallicity value of equation 2 in Jian+19.
+
+    fe_h_err : float, optional
+        The error of the metallicity value. If not specify, will assume no error in metallicity.
+
+    abun : list like, optional
+        Abundance value of equation 2 in Jian+19. Have to be in the same length of the rows in df. If not specify, will assume no error in metallicity.
+
+    abun_err : list like, optional
+        The error of the abundance value. Use 0 if assume no error in abundance. If not specify, will assume no error in abundance.
+
+    Returns
+    --------
+    T_LDR : float
+        The weighted averaged temperature derived from LDR relations.
+
+    T_LDR_err : float
+        The error of T_LDR
+
+    df : pandas.DataFrame, optional
+        The DataFrame containing T_LDRi.
+    '''
 
     # Calculate T_LDRi
     LDR0 = df['LDR']-df['r0']
@@ -228,9 +320,7 @@ def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=Fals
             raise IndexError("The length of abun_err have to be the same as df.")
         else:
             T_err_abun = private.np.array(abun_err) * df['f_wm']
-        print(T_err_abun)
         df['T_LDRi_error'] = (T_err_r**2 + T_err_fe_h**2 + T_err_abun**2 + df['sigma_wm']**2)**0.5
-        print(df['T_LDRi_error'])
 
     # Calculate T_LDR
     pointer = ~private.np.isnan(df['T_LDRi'])
@@ -244,11 +334,37 @@ def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=Fals
         return T_LDR, T_LDR_err
 
 def LDR2TLDR_WINERED(df, df_output=False):
+
+    '''
+    Function to calculate the temperature derived by each YJ-band LDR-Teff relation (T_LDRi) and their weighted mean (T_LDR).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The input DataFrame of the output of combine_df. Must contain linelist information from load_h_linelist and LDR information.
+
+    df_output : bool, optional
+        Set to True to output the DataFrame containing T_LDRi.
+
+    Returns
+    --------
+    T_LDR : float
+        The weighted averaged temperature derived from LDR relations.
+
+    T_LDR_err : float
+        The error of T_LDR.
+
+    df : pandas.DataFrame, optional
+        The DataFrame containing T_LDRi.
+    '''
+
     df['T_LDRi'] = (df['lgLDR']) * df['slope'] + df['intercept']
     T_err_r = df['lgLDR_error'] * df['slope']
     df['T_LDRi_error'] = (T_err_r**2 + df['weighted_resid']**2)**0.5
 
     pointer = ~private.np.isnan(df['T_LDRi'])
+    if len(df[pointer]) == 0 and df_output:
+        return private.np.nan, private.np.nan, df
     T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=df[pointer]['T_LDRi_error'])
     weights = 1/df[pointer]['T_LDRi_error']**2
     T_LDR_err = (private.np.sum(weights*(df[pointer]['T_LDRi']-T_LDR)**2) / (len(df)-1) / private.np.sum(weights))**0.5
@@ -260,6 +376,36 @@ def LDR2TLDR_WINERED(df, df_output=False):
 
 def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
+    '''
+    Function to classify stars with WINERED spectra into dwarf, giant and supergiant. At least the spectra of order 54 or 56 have to be provided.
+
+    Parameters
+    ----------
+    spectra_dict : dict
+        A set of spectras grouped into dict format using orders to indicate their keys.
+        Example: {43:[wav1, flux1], 43:[wav2, flux2]}; wav and flux should be numpy.array.
+
+    SNR_dict : dict
+        A dict containing SNR of the spectra, use orders to indicate their keys. Should have the same length with spectra_dict.
+
+    df_output : bool, optional
+        Set to True to output the DataFrame containing T_LDRi of the selected type.
+
+    Returns
+    -----------
+    type : str
+        The type among dwarf, giant and supergiant selected.
+
+    T_LDR : float
+        The weighted averaged temperature derived from the set of selected LDR relations .
+
+    T_LDR_err : float
+        The error of T_LDR.
+
+    df : pandas.DataFrame, optional
+        The DataFrame containing T_LDRi of the selected set.
+    '''
+
     order_list = list(range(43,49)) + list(range(52,58))
     order_list = order_list[::-1]
 
@@ -269,26 +415,30 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
     yj_df_all = []
 
     for l_type in ['dwarf', 'giant', 'supergiant']:
-        yj_line_pd = load_yj_linelist(l_type)
+        yj_line_df = load_yj_linelist(l_type)
 
+        order_list = list(spectra_dict.keys())[::-1]
         for order in order_list:
+            yj_linre_df_order = yj_line_df[yj_line_df['order'] == order]
             yj1 = depth_measure(spectra_dict[order][0], spectra_dict[order][1],
-                                       yj_line_pd[yj_line_pd['order'] == order]['linewav1'].values, SNR=SNR_dict[order], suffix=1)
+                                       yj_line_df[yj_line_df['order'] == order]['linewav1'].values, SNR=SNR_dict[order], suffix=1)
             yj2 = depth_measure(spectra_dict[order][0], spectra_dict[order][1],
-                                       yj_line_pd[yj_line_pd['order'] == order]['linewav2'].values, SNR=SNR_dict[order], suffix=2)
+                                       yj_line_df[yj_line_df['order'] == order]['linewav2'].values, SNR=SNR_dict[order], suffix=2)
             yj_ldr = cal_ldr(yj1, yj2, type='lgLDR')
 
-            if order == 57:
+            if order == order_list[0]:
+                yj_line_df_final = yj_linre_df_order
                 yj1_all = yj1
                 yj2_all = yj2
                 yj_ldr_all = yj_ldr
             else:
+                yj_line_df_final = private.pd.concat([yj_line_df_final, yj_linre_df_order])
                 yj1_all = private.pd.concat([yj1_all, yj1])
                 yj2_all = private.pd.concat([yj2_all, yj2])
                 yj_ldr_all = private.pd.concat([yj_ldr_all, yj_ldr])
 
         yj_ldr_all.reset_index(drop=True, inplace=True)
-        yj_df = combine_df([yj_line_pd, yj1_all, yj2_all, yj_ldr_all])
+        yj_df = combine_df([yj_line_df_final, yj1_all, yj2_all, yj_ldr_all])
         T_LDR, T_LDR_error, yj_df = LDR2TLDR_WINERED(yj_df, df_output=True)
         T_LDR_scatter.append(private.np.std(yj_df['T_LDRi']))
         T_LDR_all.append(T_LDR)
@@ -299,11 +449,16 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
     elif private.np.argmin(T_LDR_scatter) == 0:
         return 'dwarf', T_LDR_all[0], T_LDR_error_all[0]
 
+    if not(56 in spectra_dict.keys()) and not(54 in spectra_dict.keys()):
+        raise IndexError("Order 56 and 54 not included in spectra_dict, cannot judge l_type between giant and supergiant.")
     class_span = {56:[10036.7, [10043.3, 10052.8]],
                   54:[[10458, 10461.5]]}
     depth_giant = []
     for order in [56, 54]:
-        wav = spectra_dict[order][0]
+        try:
+            wav = spectra_dict[order][0]
+        except KeyError:
+            continue
         flux = spectra_dict[order][1]
         for line in class_span[order]:
             if type(line) != list:
@@ -313,7 +468,7 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
                 depth_giant.append(EW)
     count = 0
     cut_dict = {0:0.3, 1:0.5, 2:0.2}
-    for j in range(3):
+    for j in range(len(depth_giant)):
         if private.np.isnan(depth_giant[j]):
             count += 0
         elif depth_giant[j] > cut_dict[j]:
