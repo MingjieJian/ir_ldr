@@ -1,11 +1,11 @@
 from setuptools import setup
 
-setup(name='ruler',
+setup(name='ir_ldr',
       version='0.1',
-      description='The ruler for spectra',
+      description='The python package to deal with infrared LDR.',
       url='',
       author='Mingjie Jian',
       author_email='ssaajianmingjie@gmail.com',
       license='MIT',
-      packages=['ruler'],
+      packages=['ir_ldr'],
       zip_safe=False)
