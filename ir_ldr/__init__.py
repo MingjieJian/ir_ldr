@@ -383,7 +383,7 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
     ----------
     spectra_dict : dict
         A set of spectras grouped into dict format using orders to indicate their keys.
-        Example: {43:[wav1, flux1], 43:[wav2, flux2]}; wav and flux should be numpy.array.
+        Example: {43:[wav1, flux1], 43:[wav2, flux2], ...}; wav and flux should be numpy.array.
 
     SNR_dict : dict
         A dict containing SNR of the spectra, use orders to indicate their keys. Should have the same length with spectra_dict.
@@ -451,7 +451,7 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
     if not(56 in spectra_dict.keys()) and not(54 in spectra_dict.keys()):
         raise IndexError("Order 56 and 54 not included in spectra_dict, cannot judge l_type between giant and supergiant.")
-    class_span = {56:[10036.7, [10043.3, 10052.8]],
+    class_span = {56:[10036.653, [10043.3, 10052.8]],
                   54:[[10458, 10461.5]]}
     depth_giant = []
     for order in [56, 54]:
