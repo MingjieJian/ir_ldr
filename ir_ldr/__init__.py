@@ -40,6 +40,36 @@ def load_h_linelist():
     df = private.pd.read_csv(__path__[0] + '/file/h-ldr/lineratio_giant.csv')
     return df
 
+def lineele2ele(string):
+
+    '''
+    Function to output the element name from "lineelement".
+    '''
+
+    string = string.split('1')[0]
+
+    return string
+
+def cal_delta_chi(df):
+
+    '''
+    Function to calculate Delta_chi of the line pair.
+    '''
+
+    chi_df = private.pd.read_csv('/media/mingjie/8AE8355FE8354AA9/py-package/ir_ldr/ir_ldr/file/chi_table.csv')
+
+    chi1 = private.pd.merge(df, chi_df,
+         left_on='lineelement1', right_on='atomic_number', how='left')
+    chi1 = chi1.loc[:,'chi']
+
+    chi2 = private.pd.merge(df, chi_df,
+         left_on='lineelement2', right_on='atomic_number', how='left')
+    chi2 = chi2.loc[:,'chi']
+
+    df = df.assign(del_chi=private.np.abs(chi1 - chi2))
+
+    return df
+
 def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola', plot=False):
     '''
     Function to measure the line depth of a spectrum. Provides the Gaussian, parabola and Gaussian-Hermite function for fitting the line. Require signal to noise ratio (SNR) to calculate the error of line depth; if not given, then only the fitting error will be included. There is no error estimation for Guassian-Hermite fitting now.
@@ -119,7 +149,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
             if SNR != False:
                 poly_err = (poly_err**2+1/SNR**2/len(sub_wav))**0.5
             poly_flag = 0
-            if poly_res[0][0] < 0:
+            if poly_res[0][0] < 0 or poly_depth < 0:
                 poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 2
             elif abs(poly_del_wav) > private.np.max(sub_wav-line):
                 poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 1
@@ -138,7 +168,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
             else:
                 gauss_depth = gauss_res[0][0]
                 gauss_del_wav = abs(gauss_res[0][1] - line)
-                if gauss_res[1][0,0] == private.np.inf or gauss_res[1][0,0] == private.np.nan or gauss_res[1][0,0] < 0:
+                if gauss_res[1][0,0] == private.np.inf or gauss_res[1][0,0] == private.np.nan or gauss_res[1][0,0] < 0 or gauss_depth < 0:
                     gauss_err = private.np.nan
                     gauss_flag = 2
                 else:
@@ -374,6 +404,14 @@ def LDR2TLDR_WINERED(df, df_output=False):
     else:
         return T_LDR, T_LDR_err
 
+def Teff2LDR(df, teff):
+    '''
+    Calculate LDR from a given Teff.
+    '''
+    LDR_T = (teff - df['intercept']) / df['slope']
+    df = df.assign(lgLDR_T=LDR_T)
+    return df
+
 def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
     '''
@@ -412,10 +450,12 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
     T_LDR_scatter = []
     T_LDR_all = []
     T_LDR_error_all = []
+    redu_chi2_all = []
     yj_df_all = []
 
     for l_type in ['dwarf', 'giant', 'supergiant']:
         yj_line_df = load_yj_linelist(l_type)
+        yj_line_df = cal_delta_chi(yj_line_df)
 
         order_list = list(spectra_dict.keys())[::-1]
         for order in order_list:
@@ -439,14 +479,25 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
         yj_ldr_all.reset_index(drop=True, inplace=True)
         yj_df = combine_df([yj_line_df_final, yj1_all, yj2_all, yj_ldr_all])
+        # if renew:
+        #     yj_df.loc[yj_df['del_chi'] < 0.9, ['lgLDR', 'lgLDR_error']] = private.np.nan
         T_LDR, T_LDR_error, yj_df = LDR2TLDR_WINERED(yj_df, df_output=True)
+
+        yj_df = Teff2LDR(yj_df, T_LDR)
+        pointer = ~private.np.isnan(yj_df['lgLDR'])
+        if len(yj_df[pointer]) == 0:
+            return 'unknown', private.np.nan, private.np.nan
+        redu_chi2 = private.np.average((yj_df[pointer]['lgLDR']-yj_df[pointer]['lgLDR_T'])**2 * 1/yj_df[pointer]['lgLDR_error']**2)
+
+        redu_chi2_all.append(redu_chi2)
         T_LDR_scatter.append(private.np.std(yj_df['T_LDRi']))
         T_LDR_all.append(T_LDR)
         T_LDR_error_all.append(T_LDR_error)
         yj_df_all.append(yj_df)
-    if private.np.argmin(T_LDR_scatter) == 0 and df_output:
+
+    if private.np.argmin(redu_chi2_all) == 0 and df_output:
         return 'dwarf', T_LDR_all[0], T_LDR_error_all[0], yj_df_all[0]
-    elif private.np.argmin(T_LDR_scatter) == 0:
+    elif private.np.argmin(redu_chi2_all) == 0:
         return 'dwarf', T_LDR_all[0], T_LDR_error_all[0]
 
     if not(56 in spectra_dict.keys()) and not(54 in spectra_dict.keys()):
