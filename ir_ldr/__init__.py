@@ -412,6 +412,18 @@ def Teff2LDR(df, teff):
     df = df.assign(lgLDR_T=LDR_T)
     return df
 
+def return_min(reduc_list):
+
+    '''
+    Function to find the location of minimum and second minimum of a list.
+    '''
+
+    reduc_list_use = private.copy.copy(reduc_list)
+    min1 = private.np.argmin(reduc_list_use)
+    reduc_list_use[min1] = private.np.inf
+    min2 = private.np.argmin(reduc_list_use)
+    return [min1, min2]
+
 def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
     '''
@@ -444,12 +456,14 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
         The DataFrame containing T_LDRi of the selected set.
     '''
 
+    l_type_dict = {0:'dwarf', 1:'giant', 2:'supergiant'}
+
     order_list = list(range(43,49)) + list(range(52,58))
     order_list = order_list[::-1]
 
-    T_LDR_scatter = []
     T_LDR_all = []
     T_LDR_error_all = []
+    n_all = []
     redu_chi2_all = []
     yj_df_all = []
 
@@ -485,15 +499,26 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
         yj_df = Teff2LDR(yj_df, T_LDR)
         pointer = ~private.np.isnan(yj_df['lgLDR'])
-        if len(yj_df[pointer]) == 0:
+        if len(yj_df[pointer]) <= 1:
             return 'unknown', private.np.nan, private.np.nan
         redu_chi2 = private.np.average((yj_df[pointer]['lgLDR']-yj_df[pointer]['lgLDR_T'])**2 * 1/yj_df[pointer]['lgLDR_error']**2)
 
         redu_chi2_all.append(redu_chi2)
-        T_LDR_scatter.append(private.np.std(yj_df['T_LDRi']))
+        n_all.append(len(yj_df[pointer]))
         T_LDR_all.append(T_LDR)
         T_LDR_error_all.append(T_LDR_error)
         yj_df_all.append(yj_df)
+    # print(redu_chi2_all, n_all)
+
+    # Run the F test
+    min_list = return_min(redu_chi2_all)
+    p_value = private.f.cdf(redu_chi2_all[min_list[0]]/redu_chi2_all[min_list[1]], n_all[min_list[0]]-1, n_all[min_list[1]]-1)
+    # print(p_value)
+
+    if min_list[0] == 0 and p_value <= 0.05:
+        return l_type_dict[min_list[0]], T_LDR_all[min_list[0]], T_LDR_error_all[min_list[0]]
+    elif min_list[0] == 0 and p_value > 0.05:
+        return 'unknown', private.np.nan, private.np.nan
 
     if private.np.argmin(redu_chi2_all) == 0 and df_output:
         return 'dwarf', T_LDR_all[0], T_LDR_error_all[0], yj_df_all[0]

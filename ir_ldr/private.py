@@ -1,7 +1,9 @@
+import copy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from scipy.stats import f
 
 def Gauss_func(x, a, x0, sigma):
     '''
