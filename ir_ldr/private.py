@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from scipy.stats import f
+from scipy.stats import f, t
 
 def Gauss_func(x, a, x0, sigma):
     '''

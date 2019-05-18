@@ -56,7 +56,7 @@ def cal_delta_chi(df):
     Function to calculate Delta_chi of the line pair.
     '''
 
-    chi_df = private.pd.read_csv('/media/mingjie/8AE8355FE8354AA9/py-package/ir_ldr/ir_ldr/file/chi_table.csv')
+    chi_df = private.pd.read_csv(__path__[0] + '/file/chi_table.csv')
 
     chi1 = private.pd.merge(df, chi_df,
          left_on='lineelement1', right_on='atomic_number', how='left')
@@ -66,7 +66,7 @@ def cal_delta_chi(df):
          left_on='lineelement2', right_on='atomic_number', how='left')
     chi2 = chi2.loc[:,'chi']
 
-    df = df.assign(del_chi=private.np.abs(chi1 - chi2))
+    df = df.assign(del_chi=chi1 - chi2)
 
     return df
 
@@ -389,8 +389,9 @@ def LDR2TLDR_WINERED(df, df_output=False):
     '''
 
     df['T_LDRi'] = (df['lgLDR']) * df['slope'] + df['intercept']
+    T_err_fit = t.ppf(1-0.025, df['Npoints']-2) * df['std_res'] * (1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
     T_err_r = df['lgLDR_error'] * df['slope']
-    df['T_LDRi_error'] = (T_err_r**2 + df['weighted_resid']**2)**0.5
+    df['T_LDRi_error'] = (T_err_r**2 + T_err_fit**2)**0.5
 
     pointer = ~private.np.isnan(df['T_LDRi'])
     if len(df[pointer]) == 0 and df_output:
@@ -424,9 +425,10 @@ def return_min(reduc_list):
     min2 = private.np.argmin(reduc_list_use)
     return [min1, min2]
 
-def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
+def _l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
 
     '''
+    (Deprecated)
     Function to classify stars with WINERED spectra into dwarf, giant and supergiant. At least the spectra of order 54 or 56 have to be provided.
 
     Parameters
@@ -456,6 +458,7 @@ def l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
         The DataFrame containing T_LDRi of the selected set.
     '''
 
+    raise NotImplementedError("This function is deprecated, please do not use it.")
     l_type_dict = {0:'dwarf', 1:'giant', 2:'supergiant'}
 
     order_list = list(range(43,49)) + list(range(52,58))
