@@ -1,15 +1,17 @@
 from . import private
 from . import tools
 
-def load_yj_linelist(l_type):
+def load_linelist(band, l_type):
 
     '''
     Function to load the YJ-band LDR line list and LDR-Teff relations.
 
     Parameters
     ----------
+    band : string
+        Specify the band of relation set to load. Have to be one of the following: "h" or "yj".
     l_type : string
-        Specify the type of relation set to load. Have to be one of the following: "dwarf", "giant" or "supergiant".
+        Specify the type of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf", "giant-j19", "giant-t18" or "supergiant"
 
     Returns
     ----------
@@ -17,27 +19,17 @@ def load_yj_linelist(l_type):
         DataFrame containing LDR linelist and LDR-Teff relations.
 
     '''
-
-    l_type_dict = {'dwarf':'dwarf', 'giant':'giant', 'supergiant':'spg'}
-    df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[l_type]))
-    return df
-
-def load_h_linelist():
-
-    '''
-    Function to load the H-band giant LDR line list and LDR-Teff relations.
-
-    Parameters
-    ----------
-
-    Returns
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing LDR linelist and LDR-Teff relations.
-
-    '''
-
-    df = private.pd.read_csv(__path__[0] + '/file/h-ldr/lineratio_giant.csv')
+    l_type_dict = {'dwarf':'dwarf', 'giant-j19':'giant_j19', 'giant-t18':'giant_t18', 'supergiant':'spg'}
+    if band == 'h':
+        if l_type == 'giant':
+            df = private.pd.read_csv(__path__[0] + '/file/h-ldr/lineratio_giant.csv')
+        else:
+            raise ValueError('Band or l_type incorrect.')
+    elif band == 'yj':
+        if l_type in ['dwarf', 'giant-j19', 'giant-t18', 'supergiant']:
+            df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[l_type]))
+        else:
+            raise ValueError('Band or l_type incorrect.')
     return df
 
 def lineele2ele(string):
@@ -292,7 +284,7 @@ def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=Fals
     Parameters
     ----------
     df : pandas.DataFrame
-        The input DataFrame of the output of combine_df. Must contain linelist information from load_h_linelist and LDR information.
+        The input DataFrame of the output of combine_df. Must contain linelist information from load_linelist and LDR information.
 
     metal_term : bool, optional
         Choose which set of relations (without or with metallicity/abundance terms) to be used. If set to True, then please note the setting of fe_h, fe_h_err, abun and abun_err. These two set of relations correspond to Table2 (without metal-terms) and Table3 (with metal-terms) of Jian+19.
@@ -371,7 +363,7 @@ def LDR2TLDR_WINERED(df, df_output=False):
     Parameters
     ----------
     df : pandas.DataFrame
-        The input DataFrame of the output of combine_df. Must contain linelist information from load_h_linelist and LDR information.
+        The input DataFrame of the output of combine_df. Must contain linelist information from load_linelist and LDR information.
 
     df_output : bool, optional
         Set to True to output the DataFrame containing T_LDRi.
@@ -388,17 +380,29 @@ def LDR2TLDR_WINERED(df, df_output=False):
         The DataFrame containing T_LDRi.
     '''
 
+    # Calculate the T_LDR and _TLDR_error. For T18 line set only std_res is
+    # used, while for others the confidence interval is calculated.
     df['T_LDRi'] = (df['lgLDR']) * df['slope'] + df['intercept']
-    T_err_fit = t.ppf(1-0.025, df['Npoints']-2) * df['std_res'] * (1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
     T_err_r = df['lgLDR_error'] * df['slope']
-    df['T_LDRi_error'] = (T_err_r**2 + T_err_fit**2)**0.5
+    try:
+        T_err_fit = private.t.ppf(1-0.025, df['Npoints']-2) * df['std_res'] * (1 + 1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
+        df['T_LDRi_error'] = (T_err_r**2 + T_err_fit**2)**0.5
+    except KeyError:
+        df['T_LDRi_error'] = (T_err_r**2 + df['std_res']**2)**0.5
+
+    # Exclude those outside the lgLDR range.
+    try:
+        pointer = (df['lgLDR'] > df['max_lgLDR']) | (df['lgLDR'] < df['min_lgLDR'])
+        df.at[pointer, 'T_LDRi'] = 0
+    except KeyError:
+        pass
 
     pointer = ~private.np.isnan(df['T_LDRi'])
     if len(df[pointer]) == 0 and df_output:
         return private.np.nan, private.np.nan, df
     T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=df[pointer]['T_LDRi_error'])
     weights = 1/df[pointer]['T_LDRi_error']**2
-    T_LDR_err = (private.np.sum(weights*(df[pointer]['T_LDRi']-T_LDR)**2) / (len(df)-1) / private.np.sum(weights))**0.5
+    T_LDR_err = 1 / private.np.sum(1 / df[pointer]['T_LDRi_error']**2)**0.5
 
     if df_output:
         return T_LDR, T_LDR_err, df
@@ -470,8 +474,8 @@ def _l_type_classify_WINERED(spectra_dict, SNR_dict, df_output=False):
     redu_chi2_all = []
     yj_df_all = []
 
-    for l_type in ['dwarf', 'giant', 'supergiant']:
-        yj_line_df = load_yj_linelist(l_type)
+    for l_type in ['dwarf', 'giant-j19', 'supergiant']:
+        yj_line_df = load_linelist('yj', l_type)
         yj_line_df = cal_delta_chi(yj_line_df)
 
         order_list = list(spectra_dict.keys())[::-1]
