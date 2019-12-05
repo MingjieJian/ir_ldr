@@ -58,6 +58,8 @@ def cal_delta_chi(df):
          left_on='lineelement2', right_on='atomic_number', how='left')
     chi2 = chi2.loc[:,'chi']
 
+    df = df.assign(chi1=chi1)
+    df = df.assign(chi2=chi2)
     df = df.assign(del_chi=chi1 - chi2)
 
     return df
@@ -96,7 +98,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
     '''
 
     # Convert the type of line into list (if only one number was input)
-    if type(line_input) == int or type(line_input) == float:
+    if type(line_input) == int or type(line_input) == float or type(line_input) == private.np.float64:
         line_input = [line_input]
 
     # Create an empty list to store the result.
@@ -139,7 +141,8 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
             poly_err = ((b**2/(4*a**2))**2*poly_res[1][0,0] + (b/(2*a))**2*poly_res[1][1,1] + poly_res[1][2,2]
                    - b**3/(8*a**3)*poly_res[1][1,0] + b**2/(4*a**2)*poly_res[1][2,0] - b/(2*a)*poly_res[1][2,1])**0.5
             if SNR != False:
-                poly_err = (poly_err**2+1/SNR**2/len(sub_wav))**0.5
+                # poly_err = (poly_err**2+1/SNR**2/len(sub_wav))**0.5
+                poly_err = 1/SNR
             poly_flag = 0
             if poly_res[0][0] < 0 or poly_depth < 0:
                 poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 2
@@ -166,7 +169,8 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
                 else:
                     gauss_err = (gauss_res[1][0,0])**0.5
                     if SNR != False:
-                        gauss_err = (gauss_err**2+1/SNR**2/len(sub_wav))**0.5
+                        # gauss_err = (gauss_err**2+1/SNR**2/len(sub_wav))**0.5
+                        gauss_err = 1/SNR
                     gauss_flag = 0
                     if plot:
                         x = private.np.arange(line-1.5, line+1.5, 0.001)
@@ -187,8 +191,9 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
                     y.append(private.GH_func(i, GH_res[0], GH_res[1], GH_res[2], GH_res[3], GH_res[4]))
                 GH_depth = 1 - min(y)
                 GH_del_wav = x[private.np.argmin(y)] - line
-                GH_err = -99
+                GH_err = 1/SNR
                 GH_flag = 0
+
                 if plot:
                     private.plt.scatter(sub_wav, sub_flux, c='C4')
                     private.plt.plot(x, y, c='C0', label='Gauss-Hermit fitting')
