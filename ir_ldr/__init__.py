@@ -398,7 +398,7 @@ def LDR2TLDR_WINERED(df, df_output=False):
     # Exclude those outside the lgLDR range.
     try:
         pointer = (df['lgLDR'] > df['max_lgLDR']) | (df['lgLDR'] < df['min_lgLDR'])
-        df.at[pointer, 'T_LDRi'] = 0
+        df.at[pointer, 'T_LDRi'] = private.np.nan
     except KeyError:
         pass
 
