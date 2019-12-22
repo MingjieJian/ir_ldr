@@ -351,9 +351,12 @@ def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=Fals
 
     # Calculate T_LDR
     pointer = ~private.np.isnan(df['T_LDRi'])
-    T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=df[pointer]['T_LDRi_error'])
-    weights = 1/df[pointer]['T_LDRi_error']**2
-    T_LDR_err = (private.np.sum(weights*(df[pointer]['T_LDRi']-T_LDR)**2) / (len(df)-1) / private.np.sum(weights))**0.5
+    if len(df[pointer]['T_LDRi']) <= 0:
+        T_LDR, T_LDR_err = private.np.nan, private.np.nan
+    else:
+        weights = 1/df[pointer]['T_LDRi_error']**2
+        T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=weights)
+        T_LDR_err = (private.np.sum(weights*(df[pointer]['T_LDRi']-T_LDR)**2) / (len(df)-1) / private.np.sum(weights))**0.5
 
     if df_output:
         return T_LDR, T_LDR_err, df
@@ -390,7 +393,7 @@ def LDR2TLDR_WINERED(df, df_output=False):
     df['T_LDRi'] = (df['lgLDR']) * df['slope'] + df['intercept']
     T_err_r = df['lgLDR_error'] * df['slope']
     try:
-        T_err_fit = private.t.ppf(1-0.025, df['Npoints']-2) * df['std_res'] * (1 + 1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
+        T_err_fit = private.t.ppf(1-0.32/2, df['Npoints']-2) * df['std_res'] * (1 + 1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
         df['T_LDRi_error'] = (T_err_r**2 + T_err_fit**2)**0.5
     except KeyError:
         df['T_LDRi_error'] = (T_err_r**2 + df['std_res']**2)**0.5
@@ -403,11 +406,12 @@ def LDR2TLDR_WINERED(df, df_output=False):
         pass
 
     pointer = ~private.np.isnan(df['T_LDRi'])
-    if len(df[pointer]) == 0 and df_output:
-        return private.np.nan, private.np.nan, df
-    T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=df[pointer]['T_LDRi_error'])
-    weights = 1/df[pointer]['T_LDRi_error']**2
-    T_LDR_err = 1 / private.np.sum(1 / df[pointer]['T_LDRi_error']**2)**0.5
+    if len(df[pointer]) == 0 :
+        T_LDR, T_LDR_err = private.np.nan, private.np.nan
+    else:
+        weights = 1/df[pointer]['T_LDRi_error']**2
+        T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=weights)
+        T_LDR_err = 1 / private.np.sum(1 / df[pointer]['T_LDRi_error']**2)**0.5
 
     if df_output:
         return T_LDR, T_LDR_err, df
