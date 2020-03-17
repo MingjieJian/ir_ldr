@@ -53,3 +53,23 @@ def find_continuum(wav, flux, thres=100, flat_pixels=3, mean_thres=0.03):
     position = list(set(position))
     position.sort()
     return position
+
+def return_min(reduc_list):
+
+    '''
+    Function to find the location of minimum and second minimum of a list.
+    '''
+
+    reduc_list_use = private.copy.copy(reduc_list)
+    min1 = private.np.argmin(reduc_list_use)
+    reduc_list_use[min1] = private.np.inf
+    min2 = private.np.argmin(reduc_list_use)
+    return [min1, min2]
+
+def Teff2LDR(df, teff):
+    '''
+    Calculate LDR from a given Teff.
+    '''
+    LDR_T = (teff - df['intercept']) / df['slope']
+    df = df.assign(lgLDR_T=LDR_T)
+    return df
