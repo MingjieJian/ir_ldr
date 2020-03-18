@@ -15,7 +15,7 @@ This package relys on `numpy`, `pandas`, `matplotlib` and `scipy.optimize.curvef
 
 # Tutorial
 
-The synthetic spectra of a dwarf (Teff=5000 K, logg=4.5 dex and feh=0 dex in `ir_ldr/file/dwarf` for an example of T_LDR calculation.
+The synthetic spectra of a dwarf star (Teff=5000 K, logg=4.5 dex and feh=0 dex; generated from MOOG) in `ir_ldr/file/dwarf` for an example of T_LDR calculation.
 
 ```py
 # Load the linelist.

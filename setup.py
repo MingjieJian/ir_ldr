@@ -1,13 +1,26 @@
-from setuptools import setup
+import setuptools
 
-setup(name='ir_ldr',
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+setuptools.setup(
+      name='ir_ldr-mingjie',
       version='0.1.0',
       description='The python package to deal with infrared LDR and Teff.',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       url='https://github.com/MingjieJian/ir_ldr',
       author='Mingjie Jian',
       author_email='ssaajianmingjie@gmail.com',
-      license='MIT',
-      packages=['ir_ldr'],
+      classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Framework :: IPython",
+        "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+        "Topic :: Scientific/Engineering :: Astronomy"
+      ],
+      packages=setuptools.find_packages(),
       install_requires=[
           'numpy',
           'pandas',
