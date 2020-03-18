@@ -1,0 +1,4 @@
+include ir_ldr/file/*
+include ir_ldr/file/example_spectra/*
+include ir_ldr/file/h-ldr/*
+include ir_ldr/file/yj-ldr/*

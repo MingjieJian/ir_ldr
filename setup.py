@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-      name='ir_ldr-mingjie',
-      version='0.1.0',
+      name='ir_ldr',
+      version='0.1.2',
       description='The python package to deal with infrared LDR and Teff.',
       long_description=long_description,
       long_description_content_type="text/markdown",
@@ -22,9 +22,10 @@ setuptools.setup(
       ],
       packages=setuptools.find_packages(),
       install_requires=[
-          'numpy',
-          'pandas',
-          'matplotlib',
-          'scipy',
+          'numpy>=1.17.0',
+          'pandas>=0.20.0',
+          'matplotlib>=3.0.0',
+          'scipy>=1.0.0',
       ],
+      include_package_data=True,
       zip_safe=False)

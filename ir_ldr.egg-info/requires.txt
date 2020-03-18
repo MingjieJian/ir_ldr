@@ -1,4 +1,4 @@
-numpy
-pandas
-matplotlib
-scipy
+numpy>=1.17.0
+pandas>=0.20.0
+matplotlib>=3.0.0
+scipy>=1.0.0
