@@ -1,8 +1,8 @@
 Metadata-Version: 1.0
 Name: ir-ldr
-Version: 0.1
-Summary: The python package to deal with infrared LDR.
-Home-page: UNKNOWN
+Version: 0.1.0
+Summary: The python package to deal with infrared LDR and Teff.
+Home-page: https://github.com/MingjieJian/ir_ldr
 Author: Mingjie Jian
 Author-email: ssaajianmingjie@gmail.com
 License: MIT

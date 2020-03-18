@@ -13,9 +13,9 @@ This package relys on `numpy`, `pandas`, `matplotlib` and `scipy.optimize.curvef
 - `pip install .`
 - Then you can import this package in python environment
 
-# Turorial
+# Tutorial
 
-The synthetic spectra of a dwarf (Teff=5000 K, logg=4.0 dex and feh=0 dex) and supergiant (Teff=5000 K, logg=2.0 dex and feh=0 dex) are in `ir_ldr/file/` for an example of T_LDR calculation.
+The synthetic spectra of a dwarf (Teff=5000 K, logg=4.5 dex and feh=0 dex in `ir_ldr/file/dwarf` for an example of T_LDR calculation.
 
 ```py
 # Load the linelist.
@@ -35,20 +35,31 @@ for order in [43, 44, 45, 46, 47, 48, 52, 53, 54, 55, 56, 57]:
         continue
     linelist_sub.reset_index(drop=True, inplace=True)
 
-    # Measure the line depth of low(1)- and high(2)-EP line
-    d1 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav1'], suffix=1)
-    d2 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav2'], suffix=2)
+    # Measure the line depth of low(1)- and high(2)-EP line.
+    # Here the signal to noise ratio for the target star and telluric standard are
+    # manually set as 300, but the S_N of synthetic spectra is much higher than that.
+    d1 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav1'], suffix=1, S_N=[300, 300])
+    d2 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav2'], suffix=2, S_N=[300, 300])
 
     # Calculate the logLDR value.
     lgLDR = ir_ldr.cal_ldr(d1, d2, type='lgLDR')
-    # Combine the Dataframes.
+    # Combine the Dataframes of one order.
     record = ir_ldr.combine_df([linelist_sub, d1, d2, lgLDR])
+
     if order == 43:
         record_all = record
     else:
         record_all = pd.concat([record_all, record], sort=False)
+
 # Calculate T_LDR
-ir_ldr.LDR2TLDR_WINERED(record)
+LDR = ir_ldr.ldr2tldr_winered_solar(record_all, df_output=True)
+```
+
+And the result `(T_LDR, T_LDR_err)` is:
+```py
+LDR[0:2]
+>>> (5009.857201559249, 22.35966233607925)
+# Note the T_LDR_err is not an accurate estimation here since the S_N is manually set.
 ```
 
 # Author

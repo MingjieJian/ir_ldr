@@ -1,5 +1,4 @@
 from . import private
-from . import tools
 
 def load_linelist(band, l_type):
 
@@ -87,7 +86,7 @@ def cal_delta_chi(df):
 
     return df
 
-def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola', plot=False):
+def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola', del_wav_lim=0.2, plot=False):
     '''
     Measure the line depth of a spectrum. Provides the Gaussian, parabola and Gaussian-Hermite function for fitting the line. Require signal to noise ratio (SNR) to calculate the error of line depth; if not given, then only the fitting error will be included. There is no error estimation for Guassian-Hermite fitting now.
 
@@ -105,11 +104,14 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
     suffix : int or str, optional
         Suffix of columns of the output pandas DataFrame. 1 for low EP line and 2 for high EP line. If set to False, no suffix will be added, but it cannot be used to calculate the LDR in cal_LDR.
 
-    SNR : float, optional
+    S_N : int, float or list with length 2, optional
         Signal to noise ratio of the spectrum.
 
     func : string, default 'parabola'
         Function to be used in fitting. Can be 'parabola', 'Gauss' or 'GH' (Gaussian-Hermite).
+
+    del_wav_lim : float, default 0.2
+        The limit of measured wavelength and specified wavelength in Angstrom; default is 0.2 AA.
 
     plot : bool, default false
         To control plot the points used for fitting and the fitted function or not.
@@ -126,6 +128,16 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
 
     # Create an empty list to store the result.
     depth_measure_list = []
+
+    # Calculate the error of depth if S_N is provided.
+    if type(S_N) in [int, float]:
+        d_err = 1 / S_N
+    elif type(S_N) == list and len(S_N) == 2:
+        d_err = (1/S_N[0]**2 + 1/S_N[1]**2)**0.5
+    elif S_N == False:
+        pass
+    else:
+        raise TypeError('The type or length of S_N is incorrect.')
 
     # Do a loop for all the lines inside linelist.
     for line in line_input:
@@ -163,14 +175,13 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
             a = poly_res[0][0]; b = poly_res[0][1]; c = poly_res[0][2]
             poly_err = ((b**2/(4*a**2))**2*poly_res[1][0,0] + (b/(2*a))**2*poly_res[1][1,1] + poly_res[1][2,2]
                    - b**3/(8*a**3)*poly_res[1][1,0] + b**2/(4*a**2)*poly_res[1][2,0] - b/(2*a)*poly_res[1][2,1])**0.5
-            if SNR != False:
-                # poly_err = (poly_err**2+1/SNR**2/len(sub_wav))**0.5
-                poly_err = 1/SNR
+            if S_N != False:
+                poly_err = d_err
             poly_flag = 0
             if poly_res[0][0] < 0 or poly_depth < 0:
-                poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 2
-            elif abs(poly_del_wav) > private.np.max(sub_wav-line):
-                poly_depth = private.np.nan; poly_del_wav = private.np.nan; poly_err = private.np.nan; poly_flag = 1
+                poly_flag = 2
+            elif abs(poly_del_wav) > del_wav_lim:
+                poly_flag = 1
             if plot:
                 private.plt.scatter(sub_wav, sub_flux, c='red')
                 # x = private.np.arange(sub_wav[0], sub_wav[-1],0.001)
@@ -182,18 +193,18 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
             try:
                 gauss_res = private.curve_fit(private.Gauss_func, sub_wav, sub_flux, p0=[0.5, line, 1])
             except:
-                gauss_depth = private.np.nan; gauss_del_wav = private.np.nan; gauss_err = private.np.nan; gauss_flag = 2
+                gauss_flag = 2
             else:
                 gauss_depth = gauss_res[0][0]
-                gauss_del_wav = abs(gauss_res[0][1] - line)
+                gauss_del_wav = gauss_res[0][1] - line
                 if gauss_res[1][0,0] == private.np.inf or gauss_res[1][0,0] == private.np.nan or gauss_res[1][0,0] < 0 or gauss_depth < 0:
-                    gauss_err = private.np.nan
                     gauss_flag = 2
+                elif abs(gauss_del_wav) > del_wav_lim:
+                    gauss_flag = 1
                 else:
                     gauss_err = (gauss_res[1][0,0])**0.5
-                    if SNR != False:
-                        # gauss_err = (gauss_err**2+1/SNR**2/len(sub_wav))**0.5
-                        gauss_err = 1/SNR
+                    if S_N != False:
+                        gauss_err = d_err
                     gauss_flag = 0
                     if plot:
                         x = private.np.arange(line-1.5, line+1.5, 0.001)
@@ -205,7 +216,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
                 GH_res = private.curve_fit(private.GH_func, sub_wav, sub_flux, p0=[private.np.min(sub_flux), line, 0.8, 0, 0])
                 GH_res = GH_res[0]
             except:
-                GH_depth = private.np.nan; GH_del_wav = private.np.nan; GH_err = private.np.nan; GH_flag = 2
+                GH_flag = 2
             else:
                 # x = private.np.arange(private.np.min(sub_wav), private.np.max(sub_wav), 0.01)
                 x = private.np.arange(line-1.5, line+1.5, 0.001)
@@ -214,7 +225,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
                     y.append(private.GH_func(i, GH_res[0], GH_res[1], GH_res[2], GH_res[3], GH_res[4]))
                 GH_depth = 1 - min(y)
                 GH_del_wav = x[private.np.argmin(y)] - line
-                GH_err = 1/SNR
+                GH_err = d_err
                 GH_flag = 0
 
                 if plot:
@@ -238,7 +249,7 @@ def depth_measure(wav, flux, line_input, suffix=False, SNR=False, func='parabola
 
     return depth_measure_pd
 
-def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
+def cal_ldr(depth_pd_1, depth_pd_2, type='LDR', flag=True):
 
     '''
     Function to calculate LDR or lg(LDR) values.
@@ -251,8 +262,11 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
     depth_pd_2 : pandas.DataFrame
         The depth measurement (output) of depth_measure with suffix 2. They act as dividends in LDR.
 
-    type : str, optional
+    type : str, default 'LDR'
         The type of LDR to be calculated. Have to be 'ldr' or 'lgldr' (log10).
+
+    flag : bool, default True
+        When True the lgLDR and error values of the line pairs with flag1 or flag2 not equal 0 will be set as NaN.
 
     Return
     ----------
@@ -272,10 +286,13 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
         LDR_pd = private.np.column_stack([LDR, err_LDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['LDR', 'LDR_error'])
     elif type.lower() == 'lgldr':
+        LDR[LDR < 0] = private.np.nan
         lgLDR = private.np.log10(LDR)
         err_lgLDR = 1/(LDR*private.np.log(10))*err_LDR
         LDR_pd = private.np.column_stack([lgLDR, err_lgLDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['lgLDR', 'lgLDR_error'])
+    if flag:
+        LDR_pd.at[((depth_pd_1['flag1'] != 0)|(depth_pd_2['flag2'] != 0)).values,:] = private.np.nan
     return LDR_pd
 
 def combine_df(df_list, remove_line_wav=True):
@@ -304,7 +321,7 @@ def combine_df(df_list, remove_line_wav=True):
         output_df.drop('line_wav', axis=1, inplace=True)
     return output_df
 
-def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=False, abun=False, abun_err=False):
+def ldr2tldr_apogee(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=False, abun=False, abun_err=False):
 
     '''
     Function to calculate the temperature derived by each H-band LDR-Teff relation (T_LDRi) and their weighted mean (T_LDR).
@@ -386,7 +403,7 @@ def LDR2TLDR_APOGEE(df, metal_term=False, df_output=False, fe_h=0, fe_h_err=Fals
     else:
         return T_LDR, T_LDR_err
 
-def LDR2TLDR_WINERED(df, df_output=False):
+def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
 
     '''
     Function to calculate the temperature derived by each YJ-band LDR-Teff relation (T_LDRi) and their weighted mean (T_LDR).
@@ -395,6 +412,10 @@ def LDR2TLDR_WINERED(df, df_output=False):
     ----------
     df : pandas.DataFrame
         The input DataFrame of the output of combine_df. Must contain linelist information from load_linelist and LDR information.
+
+    sigma_clip : float, optional
+        Sigma clipping criteria; the T_LDRi not within sigma_clip*sigma of the mean T_LDR will be excluded.
+        If sigma_clip = 0 then no clipping is done.
 
     df_output : bool, optional
         Set to True to output the DataFrame containing T_LDRi.
@@ -425,15 +446,31 @@ def LDR2TLDR_WINERED(df, df_output=False):
     try:
         pointer = (df['lgLDR'] > df['max_lgLDR']) | (df['lgLDR'] < df['min_lgLDR'])
         df.at[pointer, 'T_LDRi'] = private.np.nan
+        df.at[pointer, 'T_LDRi_error'] = private.np.nan
     except KeyError:
         pass
 
     pointer = ~private.np.isnan(df['T_LDRi'])
-    if len(df[pointer]) == 0 :
+    if len(df[pointer]) == 0:
         T_LDR, T_LDR_err = private.np.nan, private.np.nan
     else:
         weights = 1/df[pointer]['T_LDRi_error']**2
         T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=weights)
+
+        # Do sigma clipping if necessary
+        if sigma_clip > 0:
+            V1 = private.np.sum(weights)
+            V2 = private.np.sum(weights**2)
+            # Unbiased sample std
+            dis = private.np.sum(weights * (df[pointer]['T_LDRi'] - T_LDR)**2) / (V1 - V2/V1) / len(df[pointer]['T_LDRi'])
+            dis = private.np.sqrt(dis)
+            # dis = private.np.std(df[pointer]['T_LDRi'])
+            pointer = pointer & (df['T_LDRi'] < T_LDR + sigma_clip*dis) & (df['T_LDRi'] > T_LDR - sigma_clip*dis)
+            weights = 1/df[pointer]['T_LDRi_error']**2
+            T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=weights)
+        elif sigma_clip < 0:
+            raise ValueError('Sigma_clip have to be >= 0.')
+
         T_LDR_err = 1 / private.np.sum(1 / df[pointer]['T_LDRi_error']**2)**0.5
 
     if df_output:
