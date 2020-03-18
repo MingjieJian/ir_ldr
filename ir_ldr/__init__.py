@@ -252,7 +252,7 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
         The depth measurement (output) of depth_measure with suffix 2. They act as dividends in LDR.
 
     type : str, optional
-        The type of LDR to be calculated. Have to be 'LDR' or 'lgLDR' (log10).
+        The type of LDR to be calculated. Have to be 'ldr' or 'lgldr' (log10).
 
     Return
     ----------
@@ -265,17 +265,15 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR'):
     d1_err = depth_pd_1['depth_err1'].values
     d2_err = depth_pd_2['depth_err2'].values
 
+    LDR = d1 / d2
+    err_LDR = (d1_err**2/d2**2 + d2_err**2 * d1**2/d2**4)**0.5
 
-
-
-    if type == 'LDR':
-        LDR = d1 / d2
-        err_LDR = (d1_err**2/d2**2 + d2_err**2 * d1**2/d2**4)**0.5
+    if type.lower() == 'ldr':
         LDR_pd = private.np.column_stack([LDR, err_LDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['LDR', 'LDR_error'])
-    elif type == 'lgLDR':
+    elif type.lower() == 'lgldr':
         lgLDR = private.np.log10(LDR)
-        err_lgLDR = 1/(d1/d2*private.np.log(10))*err_LDR
+        err_lgLDR = 1/(LDR*private.np.log(10))*err_LDR
         LDR_pd = private.np.column_stack([lgLDR, err_lgLDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['lgLDR', 'lgLDR_error'])
     return LDR_pd

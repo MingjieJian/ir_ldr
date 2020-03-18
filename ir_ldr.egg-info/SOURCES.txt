@@ -1,6 +1,8 @@
 README.md
+setup.py
 ir_ldr/__init__.py
 ir_ldr/private.py
+ir_ldr/tools.py
 ir_ldr.egg-info/PKG-INFO
 ir_ldr.egg-info/SOURCES.txt
 ir_ldr.egg-info/dependency_links.txt
