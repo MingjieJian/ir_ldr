@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
       name='ir_ldr',
-      version='0.2.0',
+      version='0.2.1',
       description='The python package to deal with infrared LDR and Teff.',
       long_description=long_description,
       long_description_content_type="text/markdown",
