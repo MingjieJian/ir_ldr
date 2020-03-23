@@ -102,7 +102,7 @@ def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola
         Linelist to be measured.
 
     suffix : int or str, optional
-        Suffix of columns of the output pandas DataFrame. 1 for low EP line and 2 for high EP line. If set to False, no suffix will be added, but it cannot be used to calculate the LDR in cal_LDR.
+        Suffix of columns of the output pandas DataFrame. 1 for low EP line and 2 for high EP line. If set to False, no suffix will be added, but it cannot be used to calculate the LDR in cal_ldr.
 
     S_N : int, float or list with length 2, optional
         Signal to noise ratio of the spectrum.
@@ -263,15 +263,15 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR', flag=True):
         The depth measurement (output) of depth_measure with suffix 2. They act as dividends in LDR.
 
     type : str, default 'LDR'
-        The type of LDR to be calculated. Have to be 'ldr' or 'lgldr' (log10).
+        The type of LDR to be calculated. Have to be 'ldr' or 'logldr' (log10).
 
     flag : bool, default True
-        When True the lgLDR and error values of the line pairs with flag1 or flag2 not equal 0 will be set as NaN.
+        When True the logLDR and error values of the line pairs with flag1 or flag2 not equal 0 will be set as NaN.
 
     Return
     ----------
     LDR_pd : pandas.DataFrame
-        A DataFrame containing the LDR/lgLDR values and their errors.
+        A DataFrame containing the LDR/logLDR values and their errors.
     '''
 
     d1 = depth_pd_1['depth1'].values
@@ -285,14 +285,14 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR', flag=True):
     if type.lower() == 'ldr':
         LDR_pd = private.np.column_stack([LDR, err_LDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['LDR', 'LDR_error'])
-    elif type.lower() == 'lgldr':
+    elif type.lower() == 'logldr':
         LDR[LDR < 0] = private.np.nan
-        lgLDR = private.np.log10(LDR)
-        err_lgLDR = 1/(LDR*private.np.log(10))*err_LDR
-        LDR_pd = private.np.column_stack([lgLDR, err_lgLDR])
-        LDR_pd = private.pd.DataFrame(LDR_pd, columns=['lgLDR', 'lgLDR_error'])
+        logLDR = private.np.log10(LDR)
+        err_logLDR = 1/(LDR*private.np.log(10))*err_LDR
+        LDR_pd = private.np.column_stack([logLDR, err_logLDR])
+        LDR_pd = private.pd.DataFrame(LDR_pd, columns=['logLDR', 'logLDR_error'])
     if flag:
-        LDR_pd.at[((depth_pd_1['flag1'] != 0)|(depth_pd_2['flag2'] != 0)).values,:] = private.np.nan
+        LDR_pd.at[(depth_pd_1['flag1'] != 0).values | (depth_pd_2['flag2'] != 0).values,:] = private.np.nan
     return LDR_pd
 
 def combine_df(df_list, remove_line_wav=True):
@@ -434,17 +434,17 @@ def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
 
     # Calculate the T_LDR and _TLDR_error. For T18 line set only std_res is
     # used, while for others the confidence interval is calculated.
-    df['T_LDRi'] = (df['lgLDR']) * df['slope'] + df['intercept']
-    T_err_r = df['lgLDR_error'] * df['slope']
+    df['T_LDRi'] = (df['logLDR']) * df['slope'] + df['intercept']
+    T_err_r = df['logLDR_error'] * df['slope']
     try:
-        T_err_fit = private.t.ppf(1-0.32/2, df['Npoints']-2) * df['std_res'] * (1 + 1 / df['Npoints'] + (df['lgLDR']-df['mean_lgLDR'])**2 / (df['Npoints']-1) / df['std_lgLDR']**2)**0.5
+        T_err_fit = private.t.ppf(1-0.32/2, df['Npoints']-2) * df['std_res'] * (1 + 1 / df['Npoints'] + (df['logLDR']-df['mean_logLDR'])**2 / (df['Npoints']-1) / df['std_logLDR']**2)**0.5
         df['T_LDRi_error'] = (T_err_r**2 + T_err_fit**2)**0.5
     except KeyError:
         df['T_LDRi_error'] = (T_err_r**2 + df['std_res']**2)**0.5
 
-    # Exclude those outside the lgLDR range.
+    # Exclude those outside the logLDR range.
     try:
-        pointer = (df['lgLDR'] > df['max_lgLDR']) | (df['lgLDR'] < df['min_lgLDR'])
+        pointer = (df['logLDR'] > df['max_logLDR']) | (df['logLDR'] < df['min_logLDR'])
         df.at[pointer, 'T_LDRi'] = private.np.nan
         df.at[pointer, 'T_LDRi_error'] = private.np.nan
     except KeyError:

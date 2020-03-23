@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: ir-ldr
-Version: 0.1.4
+Version: 0.2.0
 Summary: The python package to deal with infrared LDR and Teff.
 Home-page: https://github.com/MingjieJian/ir_ldr
 Author: Mingjie Jian
@@ -47,7 +47,7 @@ Description: # ir_ldr
             d2 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav2'], suffix=2, S_N=[300, 300])
         
             # Calculate the logLDR value.
-            lgLDR = ir_ldr.cal_ldr(d1, d2, type='lgLDR')
+            lgLDR = ir_ldr.cal_ldr(d1, d2, type='logLDR')
             # Combine the Dataframes of one order.
             record = ir_ldr.combine_df([linelist_sub, d1, d2, lgLDR])
         

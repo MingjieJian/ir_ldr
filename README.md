@@ -39,7 +39,7 @@ for order in [43, 44, 45, 46, 47, 48, 52, 53, 54, 55, 56, 57]:
     d2 = ir_ldr.depth_measure(wav, residual, linelist_sub['linewav2'], suffix=2, S_N=[300, 300])
 
     # Calculate the logLDR value.
-    lgLDR = ir_ldr.cal_ldr(d1, d2, type='lgLDR')
+    lgLDR = ir_ldr.cal_ldr(d1, d2, type='logLDR')
     # Combine the Dataframes of one order.
     record = ir_ldr.combine_df([linelist_sub, d1, d2, lgLDR])
 
