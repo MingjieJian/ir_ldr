@@ -130,14 +130,14 @@ def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola
     depth_measure_list = []
 
     # Calculate the error of depth if S_N is provided.
-    if type(S_N) in [int, float]:
+    if type(S_N) in [int, float, private.np.float, private.np.float32, private.np.float64]:
         d_err = 1 / S_N
     elif type(S_N) == list and len(S_N) == 2:
         d_err = (1/S_N[0]**2 + 1/S_N[1]**2)**0.5
     elif S_N == False:
         pass
     else:
-        raise TypeError('The type or length of S_N is incorrect.')
+        raise TypeError('The type or length of S_N is incorrect. Please convert it to one of the following: int, float, private.np.float, private.np.float32, private.np.float64')
 
     # Do a loop for all the lines inside linelist.
     for line in line_input:
@@ -432,8 +432,7 @@ def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
         The DataFrame containing T_LDRi.
     '''
 
-    # Calculate the T_LDR and _TLDR_error. For T18 line set only std_res is
-    # used, while for others the confidence interval is calculated.
+    # Calculate the T_LDR and _TLDR_error.
     df['T_LDRi'] = (df['logLDR']) * df['slope'] + df['intercept']
     T_err_r = df['logLDR_error'] * df['slope']
     try:
@@ -469,7 +468,7 @@ def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
             weights = 1/df[pointer]['T_LDRi_error']**2
             T_LDR = private.np.average(df[pointer]['T_LDRi'], weights=weights)
         elif sigma_clip < 0:
-            raise ValueError('Sigma_clip have to be >= 0.')
+            raise ValueError('sigma_clip have to be >= 0.')
 
         T_LDR_err = 1 / private.np.sum(1 / df[pointer]['T_LDRi_error']**2)**0.5
 

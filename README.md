@@ -2,7 +2,7 @@
 
 The package `ir_ldr` is for measuring the spectral line depth of the APOGEE and WINERED spectra, calculating the line depth ratio (LDR) and finally deriving the effective temperature (T_LDR).
 
-The LDR-Teff relations inside this package are from [Jian+19](https://ui.adsabs.harvard.edu/abs/2019MNRAS.485.1310J/abstract), [Taniguchi+18](https://ui.adsabs.harvard.edu/abs/2018MNRAS.473.4993T/abstract) and Jian+20a (in prep.). Please also refer to [Fukue+15](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...64F/abstract).
+The LDR-Teff relations inside this package are from [Jian+19](https://ui.adsabs.harvard.edu/abs/2019MNRAS.485.1310J/abstract), [Taniguchi+18](https://ui.adsabs.harvard.edu/abs/2018MNRAS.473.4993T/abstract) and [Jian+20a](http://adsabs.harvard.edu/abs/2020arXiv200310641J). Please also refer to [Fukue+15](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...64F/abstract).
 
 This package relys on `numpy`, `pandas`, `matplotlib` and `scipy`; it is based on python 3.
 
