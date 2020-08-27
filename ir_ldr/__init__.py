@@ -1,6 +1,6 @@
 from . import private
 
-def load_linelist(band, l_type):
+def load_linelist(band, table):
 
     '''
     Load the YJ-band LDR line list and LDR-Teff relation coefficients.
@@ -9,8 +9,9 @@ def load_linelist(band, l_type):
     ----------
     band : string
         Specify the band of relation set to load. Have to be one of the following: "h" or "yj".
-    l_type : string
-        Specify the type of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18" or "supergiant-j20a"
+    table : string
+        Specify the table of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18" or "supergiant-j20a". 
+        You can also specify a path to a custom line list (must be a .csv file) following the same format as dwarf-j20a; in this case the variable band will not be used. 
 
     Returns
     ----------
@@ -18,19 +19,23 @@ def load_linelist(band, l_type):
         DataFrame containing LDR linelist and LDR-Teff relations.
 
     '''
+    if table[-4:] == '.csv':
+        df = private.pd.read_csv(table)
+        return df
+
     l_type_dict = {'dwarf-j20a':'dwarf_j20a', 'giant-t18':'giant_t18', 'supergiant-j20a':'spg_j20a'}
     band = band.lower()
 
     if band == 'h':
-        if l_type == 'giant':
+        if table == 'giant':
             df = private.pd.read_csv(__path__[0] + '/file/h-ldr/lineratio_giant.csv')
         else:
-            raise ValueError('Band or l_type incorrect.')
+            raise ValueError('Band or table incorrect.')
     elif band == 'yj':
-        if l_type in ['dwarf-j20a', 'giant-t18', 'supergiant-j20a']:
-            df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[l_type]))
+        if table in ['dwarf-j20a', 'giant-t18', 'supergiant-j20a']:
+            df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[table]))
         else:
-            raise ValueError('Band or l_type incorrect.')
+            raise ValueError('Band or table incorrect.')
     return df
 
 def lineele2ele(lineelement):
@@ -312,7 +317,7 @@ def combine_df(df_list, remove_line_wav=True):
     output_df : pandas.DataFrame
         A DataFrame containing the combined values.
     '''
-    for i in range(len(df_list)):
+    for i in range(1, len(df_list)):
         if df_list[i].index[0] != 0:
             df_list[i] = df_list[i].reset_index()
 
