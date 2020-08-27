@@ -15,6 +15,9 @@ This package relys on `numpy`, `pandas`, `matplotlib` and `scipy`; it is based o
 The synthetic spectra of a dwarf star (Teff=5000 K, logg=4.5 dex and feh=0 dex; generated from MOOG) in `ir_ldr/file/dwarf` for an example of T_LDR calculation.
 
 ~~~py
+import ir_ldr
+import pandas as pd
+
 # Load the linelist.
 linelist = ir_ldr.load_linelist('yj', 'dwarf-j20a')
 
@@ -46,6 +49,8 @@ for order in [43, 44, 45, 46, 47, 48, 52, 53, 54, 55, 56, 57]:
         record_all = record
     else:
         record_all = pd.concat([record_all, record], sort=False)
+
+record_all.reset_index(drop=True, inplace=True)
 
 # Calculate T_LDR
 LDR = ir_ldr.ldr2tldr_winered_solar(record_all, df_output=True)

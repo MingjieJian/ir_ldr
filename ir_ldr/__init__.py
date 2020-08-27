@@ -317,8 +317,10 @@ def combine_df(df_list, remove_line_wav=True):
     output_df : pandas.DataFrame
         A DataFrame containing the combined values.
     '''
-    for i in range(1, len(df_list)):
-        if df_list[i].index[0] != 0:
+    for i in range(4):
+        if i not in [1,2]:
+            df_list[i] = df_list[i].reset_index(drop=True)
+        else:
             df_list[i] = df_list[i].reset_index()
 
     output_df = private.pd.concat(df_list, axis=1)
