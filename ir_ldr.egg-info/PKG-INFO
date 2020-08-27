@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: ir-ldr
-Version: 0.2.4
+Version: 0.2.5
 Summary: The python package to deal with infrared LDR and Teff.
 Home-page: https://github.com/MingjieJian/ir_ldr
 Author: Mingjie Jian
@@ -23,6 +23,9 @@ Description: # ir_ldr
         The synthetic spectra of a dwarf star (Teff=5000 K, logg=4.5 dex and feh=0 dex; generated from MOOG) in `ir_ldr/file/dwarf` for an example of T_LDR calculation.
         
         ~~~py
+        import ir_ldr
+        import pandas as pd
+        
         # Load the linelist.
         linelist = ir_ldr.load_linelist('yj', 'dwarf-j20a')
         
@@ -54,6 +57,8 @@ Description: # ir_ldr
                 record_all = record
             else:
                 record_all = pd.concat([record_all, record], sort=False)
+        
+        record_all.reset_index(drop=True, inplace=True)
         
         # Calculate T_LDR
         LDR = ir_ldr.ldr2tldr_winered_solar(record_all, df_output=True)
