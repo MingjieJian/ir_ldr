@@ -24,5 +24,7 @@ ir_ldr/file/example_spectra/dwarf/order56.txt
 ir_ldr/file/example_spectra/dwarf/order57.txt
 ir_ldr/file/h-ldr/lineratio_giant.csv
 ir_ldr/file/yj-ldr/lineratio_all_dwarf_j20a.csv
+ir_ldr/file/yj-ldr/lineratio_all_dwarf_j20b.csv
+ir_ldr/file/yj-ldr/lineratio_all_giant_j20b.csv
 ir_ldr/file/yj-ldr/lineratio_all_giant_t18.csv
 ir_ldr/file/yj-ldr/lineratio_all_spg_j20a.csv

@@ -10,7 +10,7 @@ def load_linelist(band, table):
     band : string
         Specify the band of relation set to load. Have to be one of the following: "h" or "yj".
     table : string
-        Specify the table of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18" or "supergiant-j20a". 
+        Specify the table of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18", "supergiant-j20a", "dwarf-j20b" or "giant-j20b". 
         You can also specify a path to a custom line list (must be a .csv file) following the same format as dwarf-j20a; in this case the variable band will not be used. 
 
     Returns
@@ -23,7 +23,7 @@ def load_linelist(band, table):
         df = private.pd.read_csv(table)
         return df
 
-    l_type_dict = {'dwarf-j20a':'dwarf_j20a', 'giant-t18':'giant_t18', 'supergiant-j20a':'spg_j20a'}
+    l_type_dict = {'dwarf-j20a':'dwarf_j20a', 'giant-t18':'giant_t18', 'supergiant-j20a':'spg_j20a', 'dwarf-j20b':'dwarf_j20b', 'giant-j20b':'giant_j20b'}
     band = band.lower()
 
     if band == 'h':
@@ -32,7 +32,7 @@ def load_linelist(band, table):
         else:
             raise ValueError('Band or table incorrect.')
     elif band == 'yj':
-        if table in ['dwarf-j20a', 'giant-t18', 'supergiant-j20a']:
+        if table in l_type_dict.keys():
             df = private.pd.read_csv(__path__[0] + '/file/yj-ldr/lineratio_all_{}.csv'.format(l_type_dict[table]))
         else:
             raise ValueError('Band or table incorrect.')
@@ -483,3 +483,122 @@ def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
         return T_LDR, T_LDR_err, df
     else:
         return T_LDR, T_LDR_err
+
+
+def poly2_mmtf(b, x):
+    '''
+    x[1]: Teff, x[1]: [Fe/H]
+    log(r) = b[0] + b[1]*T + b[2]*T**2 + b[3]*M + b[4]*M*T 
+    '''
+    b_nonan = [0 if private.np.isnan(i) else i for i in b]
+    return b_nonan[0] + b_nonan[1]*x[0] + b_nonan[2]*x[0]**2 + b_nonan[3]*x[1] + b_nonan[4]*x[0]*x[1]
+
+def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
+    N = 0
+    for index in range(len(record_all)):
+#     for index in [1]:
+        
+        # Skip if log_LDR_err > 0.1 or no measurement
+        if record_all.loc[index, 'log_LDR_err'] > 0.1 or private.np.isnan(record_all.loc[index, 'log_LDR']):
+            continue
+        else:
+            log_LDR = record_all.loc[index, 'log_LDR']
+            log_LDR_err = record_all.loc[index, 'log_LDR_err']
+            
+        if N == 0:
+            index_init = index
+        if l_type == 'dwarf':
+            X = private.np.arange(4400, 6700, 1) / 1000
+            Y = private.np.arange(-0.9, 0.6, 0.005)
+        elif l_type == 'giant':
+            X = private.np.arange(3000, 5500, 1) / 1000
+            Y = private.np.arange(-0.9, 0.4, 0.005)
+        else:
+            raise ValueError("l_type can only be 'dwarf' or 'giant'!")
+        X, Y = private.np.meshgrid(X, Y)
+        Z = poly2_mmtf(record_all.loc[index, ['a', 'b', 'c', 'd', 'e']].values, [X, Y])
+
+        if record_all.loc[index, 'type'] in ['A', 'B']:
+            # For each X
+            pre_interval = private.derive_fitting_interval(*list(record_all.loc[index, ['N', 'sigma', 'mean_T', 'std_T']].values),
+                                                                   1, X)
+        else:
+            # For each X and Y
+            pre_interval = private.derive_fitting_interval_2d(*list(record_all.loc[index, ['N', 'sigma', 'mean_T', 'std_T', 'mean_FeH', 'std_FeH']].values),
+                                                                      2, X, Y)
+        sigma = private.np.sqrt(pre_interval**2 + record_all.loc[index, 'sigma_r']**2 + log_LDR_err**2)
+
+        log_likelihood_i = - (0.5*private.np.log10(2 * private.np.pi * sigma ** 2) + (Z - log_LDR) ** 2 / sigma**2 / 2 * private.np.log10(private.np.e))
+#         print(log_likelihood_i)
+        N = N + 1
+        if index == index_init:
+                log_likelihood = log_likelihood_i
+        else:
+            log_likelihood = log_likelihood_i + log_likelihood
+    log_likelihood = log_likelihood - private.np.max(log_likelihood)
+        
+    likelihood = 10**log_likelihood
+    likelihood_x = private.np.sum(likelihood, axis=0) / private.np.sum(private.np.sum(likelihood, axis=0))
+    likelihood_y = private.np.sum(likelihood, axis=1) / private.np.sum(private.np.sum(likelihood, axis=1))
+    max_index = private.np.unravel_index(likelihood.argmax(), likelihood.shape)
+    Tldr = X[0][max_index[1]]
+    Mldr = Y[:, 0][max_index[0]]
+#         Tldr = X[0][np.argmax(likelihood_x)]
+    Tldr_low_err, Tldr_high_err = private.credi_interval(likelihood_x, X[0], Tldr)
+    Tldr = Tldr * 1000
+    Tldr_low_err, Tldr_high_err = Tldr_low_err*1000, Tldr_high_err*1000
+#         Mldr = Y[:, 0][np.argmax(likelihood_y)]
+    Mldr_low_err, Mldr_high_err = private.credi_interval(likelihood_y, Y[:, 0], Mldr)
+    
+    # Plot
+    if plot:
+        left, width = 0.17, 0.65
+        bottom, height = 0.14, 0.65
+        spacing = 0.005
+
+        rect_scatter = [left, bottom, width, height]
+        rect_histx = [left, bottom + height + spacing+0.0015, width, 0.2]
+        rect_histy = [left + width + spacing, bottom, 0.17, height]
+
+        ax_contour = private.plt.axes(rect_scatter)
+        ax_contour.tick_params(direction='in', top=True, right=True)
+        ax_px = private.plt.axes(rect_histx)
+        ax_px.tick_params(direction='in', labelbottom=False, labelleft=False)
+        ax_py = private.plt.axes(rect_histy)
+        ax_py.tick_params(direction='in', labelbottom=False, labelleft=False)
+
+        CS = ax_contour.contour(X*1000, Y, likelihood, [1-0.997, 1-0.95, 1-0.68], 
+                     colors='k')
+        # CS.levels = ['$3\sigma$', '$2\sigma$', '$1\sigma$']
+        # ax_contour.clabel(CS, fontsize=10, inline_spacing=2)
+
+        ax_contour.set_xlim(Tldr-200, Tldr+200)
+        ax_contour.set_ylim(Mldr-0.2, Mldr+0.2)
+
+        ax_px.set_xlim(ax_contour.get_xlim())
+        ax_py.set_ylim(ax_contour.get_ylim())
+
+        ax_contour.set_xlabel('$T_\mathrm{eff}$ (K)')
+        ax_contour.set_ylabel('[Fe/H]')
+
+        ax_contour.scatter(Tldr, Mldr)
+        ax_contour.axvline(Tldr_low_err+Tldr, c='brown', alpha=0.5, linestyle='--')
+        ax_contour.axvline(Tldr_high_err+Tldr, c='brown', alpha=0.5, linestyle='--')
+        ax_contour.axhline(Mldr_low_err+Mldr, c='brown', alpha=0.5, linestyle='--')
+        ax_contour.axhline(Mldr_high_err+Mldr, c='brown', alpha=0.5, linestyle='--')
+        ax_px.axvline(Tldr_low_err+Tldr, c='brown', alpha=0.5, linestyle='--')
+        ax_px.axvline(Tldr_high_err+Tldr, c='brown', alpha=0.5, linestyle='--')
+        ax_py.axhline(Mldr_low_err+Mldr, c='brown', alpha=0.5, linestyle='--')
+        ax_py.axhline(Mldr_high_err+Mldr, c='brown', alpha=0.5, linestyle='--')
+
+        # Plot the P
+        ax_px.plot(X[0]*1000, likelihood_x, c='k')
+        ax_py.plot(likelihood_y, Y[:, 0], c='k')
+        ax_contour.text(0.05, 0.65+0.125, '$T_\mathrm{{LDR}}={0:.0f}^{{ +{2:.0f} }}_{{ {1:.0f} }}$\n$M_\mathrm{{LDR}}$=${3:.2f}^{{ +{5:.2f} }}_{{ {4:.2f} }}$'.format(Tldr, Tldr_low_err, Tldr_high_err, 
+                                                                                           Mldr, Mldr_low_err, Mldr_high_err),
+                        transform=ax_contour.transAxes, fontsize=12)
+    if likelihood_out:
+        return [Tldr, Tldr_low_err, Tldr_high_err, Mldr, Mldr_low_err, Mldr_high_err], likelihood
+    else:
+        return [Tldr, Tldr_low_err, Tldr_high_err, Mldr, Mldr_low_err, Mldr_high_err]
+    

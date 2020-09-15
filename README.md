@@ -63,6 +63,27 @@ LDR[0:2]
 # Note the T_LDR_err is not an accurate estimation here since the S_N is manually set.
 ~~~
 
+## Update for the Bayesian approach
+
+The use of Bayesian approach method is similar to the process described above: first measure the line depth and calculate the LDR.
+Then refer to the example below:
+
+~~~py
+
+# An example for giant star measurement:
+log_LDR = [0.454, -0.076, 0.428, 0.637, -0.166, 0.479, 0.023, 0.147, 0.012, -0.078, -0.135, -0.127, 0.287, 0.334, 0.120, 0.867, np.nan, -0.135, 0.448, 0.788, np.nan, 0.009, -0.247, 0.225, 0.073, -0.126, 0.550, 0.357, 0.126, -0.030, 0.024, 0.603, 0.253, -0.364, 0.133, 0.469, np.nan, 0.227, -0.072, 0.354, 0.134, 0.143, 0.109, 0.226, 0.880, -0.012, 0.068, 0.508, np.nan, 0.216, 0.288, -0.018, 0.002, 0.397, 0.735, 0.791, 0.144, 0.238, 0.409, 0.662, -0.079, 0.330, 0.550, 0.130, 0.223, 0.494, 0.496, 0.064]
+log_LDR_err = [0.032, 0.033, 0.038, 0.060, 0.027, 0.035, 0.032, 0.029, 0.023, 0.026, 0.027, 0.028, 0.082, 0.030, 0.020, 0.052, np.nan, 0.027, 0.041, 0.043, np.nan, 0.035, 0.036, 0.021, 0.037, 0.023, 0.038, 0.017, 0.014, 0.031, 0.025, 0.049, 0.047, 0.022, 0.025, 0.056, np.nan, 0.046, 0.015, 0.027, 0.011, 0.013, 0.013, 0.045, 0.132, 0.035, 0.028, 0.045, np.nan, 0.018, 0.024, 0.022, 0.020, 0.018, 0.042, 0.047, 0.024, 0.043, 0.039, 0.072, 0.030, 0.050, 0.052, 0.040, 0.038, 0.075, 0.033, 0.026]
+
+record = ir_ldr.load_linelist('yj', 'giant-j20b')
+record['log_LDR'] = lg_LDR
+record['log_LDR_err'] = lg_LDR_err
+res = ir_ldr.cal_posterior(record, 'giant', plot=False, likelihood_out=False)
+
+~~~
+
+The result should be (3777+11-13) K and (0.08+0.05-0.04) dex. 
+When set to `True`, the keyword `plot` plots the contour of likelihood, and `likelihood_out` output the array of likelihood also.
+
 # Author
 
 Mingjie Jian (ssaajianmingjie@gmail.com)
