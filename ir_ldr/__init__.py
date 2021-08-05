@@ -10,7 +10,7 @@ def load_linelist(band, table):
     band : string
         Specify the band of relation set to load. Have to be one of the following: "h" or "yj".
     table : string
-        Specify the table of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18", "supergiant-j20a", "dwarf-j20b" or "giant-j20b". 
+        Specify the table of relation set to load. If band is "h", then have to be "giant"; if band is "yj", then have to be one of the following: "dwarf-j20a", "giant-t18", "supergiant-j20a", "dwarf-j21" or "giant-j21". 
         You can also specify a path to a custom line list (must be a .csv file) following the same format as dwarf-j20a; in this case the variable band will not be used. 
 
     Returns
@@ -23,7 +23,7 @@ def load_linelist(band, table):
         df = private.pd.read_csv(table)
         return df
 
-    l_type_dict = {'dwarf-j20a':'dwarf_j20a', 'giant-t18':'giant_t18', 'supergiant-j20a':'spg_j20a', 'dwarf-j20b':'dwarf_j20b', 'giant-j20b':'giant_j20b'}
+    l_type_dict = {'dwarf-j20a':'dwarf_j20a', 'giant-t18':'giant_t18', 'supergiant-j20a':'spg_j20a', 'dwarf-j21':'dwarf_j21', 'giant-j21':'giant_j21'}
     band = band.lower()
 
     if band == 'h':
@@ -184,6 +184,7 @@ def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola
                 poly_err = d_err
             poly_flag = 0
             if poly_res[0][0] < 0 or poly_depth < 0:
+                poly_depth, poly_del_wav, poly_err = private.np.nan, private.np.nan, private.np.nan
                 poly_flag = 2
             elif abs(poly_del_wav) > del_wav_lim:
                 poly_flag = 1
@@ -198,6 +199,7 @@ def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola
             try:
                 gauss_res = private.curve_fit(private.Gauss_func, sub_wav, sub_flux, p0=[0.5, line, 1])
             except:
+                gauss_depth, gauss_del_wav, gauss_err = private.np.nan, private.np.nan, private.np.nan
                 gauss_flag = 2
             else:
                 gauss_depth = gauss_res[0][0]
@@ -221,6 +223,7 @@ def depth_measure(wav, flux, line_input, suffix=False, S_N=False, func='parabola
                 GH_res = private.curve_fit(private.GH_func, sub_wav, sub_flux, p0=[private.np.min(sub_flux), line, 0.8, 0, 0])
                 GH_res = GH_res[0]
             except:
+                GH_depth, GH_del_wav, GH_err = private.np.nan, private.np.nan, private.np.nan
                 GH_flag = 2
             else:
                 # x = private.np.arange(private.np.min(sub_wav), private.np.max(sub_wav), 0.01)
@@ -294,6 +297,7 @@ def cal_ldr(depth_pd_1, depth_pd_2, type='LDR', flag=True):
         LDR[LDR < 0] = private.np.nan
         logLDR = private.np.log10(LDR)
         err_logLDR = 1/(LDR*private.np.log(10))*err_LDR
+        # err_logLDR = 1 / private.np.log(10) * private.np.sqrt(d1_err**2 / d1**2 + d2_err**2 / d2**2)
         LDR_pd = private.np.column_stack([logLDR, err_logLDR])
         LDR_pd = private.pd.DataFrame(LDR_pd, columns=['logLDR', 'logLDR_error'])
     if flag:
@@ -484,7 +488,6 @@ def ldr2tldr_winered_solar(df, sigma_clip=0, df_output=False):
     else:
         return T_LDR, T_LDR_err
 
-
 def poly2_mmtf(b, x):
     '''
     x[1]: Teff, x[1]: [Fe/H]
@@ -496,7 +499,6 @@ def poly2_mmtf(b, x):
 def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
     N = 0
     for index in range(len(record_all)):
-#     for index in [1]:
         
         # Skip if log_LDR_err > 0.1 or no measurement
         if record_all.loc[index, 'log_LDR_err'] > 0.1 or private.np.isnan(record_all.loc[index, 'log_LDR']):
@@ -520,8 +522,7 @@ def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
 
         if record_all.loc[index, 'type'] in ['A', 'B']:
             # For each X
-            pre_interval = private.derive_fitting_interval(*list(record_all.loc[index, ['N', 'sigma', 'mean_T', 'std_T']].values),
-                                                                   1, X)
+            pre_interval = private.derive_fitting_interval(*list(record_all.loc[index, ['N', 'sigma', 'mean_T', 'std_T']].values), 1, X)
         else:
             # For each X and Y
             pre_interval = private.derive_fitting_interval_2d(*list(record_all.loc[index, ['N', 'sigma', 'mean_T', 'std_T', 'mean_FeH', 'std_FeH']].values),
@@ -529,13 +530,18 @@ def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
         sigma = private.np.sqrt(pre_interval**2 + record_all.loc[index, 'sigma_r']**2 + log_LDR_err**2)
 
         log_likelihood_i = - (0.5*private.np.log10(2 * private.np.pi * sigma ** 2) + (Z - log_LDR) ** 2 / sigma**2 / 2 * private.np.log10(private.np.e))
-#         print(log_likelihood_i)
+        #  print(log_likelihood_i)
         N = N + 1
         if index == index_init:
                 log_likelihood = log_likelihood_i
         else:
             log_likelihood = log_likelihood_i + log_likelihood
-    log_likelihood = log_likelihood - private.np.max(log_likelihood)
+    
+    # Return np.nans if no measurement is available
+    if N == 0:
+        return [private.np.nan, private.np.nan, private.np.nan, private.np.nan, private.np.nan, private.np.nan]
+    else:
+        log_likelihood = log_likelihood - private.np.max(log_likelihood)
         
     likelihood = 10**log_likelihood
     likelihood_x = private.np.sum(likelihood, axis=0) / private.np.sum(private.np.sum(likelihood, axis=0))
@@ -543,11 +549,11 @@ def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
     max_index = private.np.unravel_index(likelihood.argmax(), likelihood.shape)
     Tldr = X[0][max_index[1]]
     Mldr = Y[:, 0][max_index[0]]
-#         Tldr = X[0][np.argmax(likelihood_x)]
+
     Tldr_low_err, Tldr_high_err = private.credi_interval(likelihood_x, X[0], Tldr)
     Tldr = Tldr * 1000
     Tldr_low_err, Tldr_high_err = Tldr_low_err*1000, Tldr_high_err*1000
-#         Mldr = Y[:, 0][np.argmax(likelihood_y)]
+
     Mldr_low_err, Mldr_high_err = private.credi_interval(likelihood_y, Y[:, 0], Mldr)
     
     # Plot
@@ -601,4 +607,3 @@ def cal_posterior(record_all, l_type, plot=False, likelihood_out=False):
         return [Tldr, Tldr_low_err, Tldr_high_err, Mldr, Mldr_low_err, Mldr_high_err], likelihood
     else:
         return [Tldr, Tldr_low_err, Tldr_high_err, Mldr, Mldr_low_err, Mldr_high_err]
-    
